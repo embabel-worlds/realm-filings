@@ -1,0 +1,35 @@
+name: realm-filings
+description: |
+  What the companies you depend on just told their regulator.
+
+  A public company cannot quietly change its chief executive, restate its
+  accounts, take on debt, lose a major customer or enter a material agreement:
+  within four business days it must file an 8-K saying so. Those filings are
+  free, machine-readable, and almost nobody watches them — so a supplier's
+  going-concern warning or a customer's CFO departure reaches you through the
+  trade press weeks later, if at all.
+
+  Name the tickers you care about and why. The realm reaches every filing each
+  of them has made, decodes the 8-K item codes into what actually happened
+  using a catalog it ships as data, and ranks by how much the event type
+  matters rather than by date — so a restatement two months old outranks a
+  routine shareholder vote from yesterday.
+
+  One source: the SEC's own EDGAR full-text search. Open, keyless, no account.
+  US-listed filers only, which is a real limit and the realm says so rather
+  than returning silence for a company that simply does not file there.
+version: 0.1.0
+author: rod
+tags:
+  - filings
+  - counterparty-risk
+  - sec
+  - edgar
+  - openapi
+  - apps
+  - handlers
+exports:
+  - edgar
+  - TrackedFiler
+  - Filing
+  - EightKItem

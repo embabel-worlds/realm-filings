@@ -1,0 +1,214 @@
+# The realm's answer surface.
+#
+# THREE RULES run through all of it.
+#
+# 1. DEDUPE BY ACCESSION. One filing is many DOCUMENTS — the 8-K itself plus its
+#    exhibits — and EDGAR indexes each separately, so a raw count double-counts
+#    every filing that had an attachment. The accession number is the filing;
+#    `_id` is the document. Every view here counts accessions.
+#
+# 2. RANK BY CONSEQUENCE, NOT BY DATE. A restatement from two months ago matters
+#    more than yesterday's shareholder vote. Severity comes from the shipped
+#    EightKItem catalog, so the ordering is a stated judgement in a file anyone
+#    can edit rather than an opinion buried in a query.
+#
+# 3. `fileDate` IS NOT THE EVENT DATE. A company has four business days to file,
+#    so an 8-K dated Monday may describe something that happened the previous
+#    Wednesday. The views say "filed", never "happened".
+#
+# 4. BOUND THE WINDOW. EDGAR's index goes back to 2001 and every event view
+#    takes `sinceMonths`, defaulting to eighteen. Two different things break
+#    without it. Ranking by consequence surfaces a decade-old auditor change
+#    above this month's news, which is true and useless. Worse, a TICKER IS NOT
+#    A COMPANY: it is retired and reissued, so `NET` returns a 2004 delisting
+#    notice from an entirely different business, correctly labelled, wholly
+#    wrong. The window makes both go away, and the views return
+#    `edgarMatchedFiler` so a collision inside the window is still visible.
+#
+# Results arrive from EDGAR in RELEVANCE order, never date order, so every
+# chronological view orders explicitly.
+
+- name: MaterialEvents
+  description: What the companies you depend on have told the SEC, most consequential first — the 8-K item decoded into what actually happened, with your own note on what you have riding on them. The view to open first.
+  params:
+    limit:
+      type: int
+      default: 30
+      description: "Maximum filings to return."
+    sinceMonths:
+      type: int
+      default: 18
+      description: "How far back to look, in months. EDGAR's index runs to 2001, and a ticker RETIRED and REISSUED to a different company will otherwise surface that company's filings as if they were yours."
+  cypher: |
+    MATCH (t:TrackedFiler)-[:HAS_FILING]->(f:Filing)
+    WHERE f.form = '8-K' AND f.primaryItem IS NOT NULL
+      AND f.fileDate >= toString(date() - duration({months: $sinceMonths}))
+    MATCH (i:EightKItem {code: f.primaryItem})
+    WITH t, i, f.accession AS accession, f.displayName AS edgarMatchedFiler, max(f.fileDate) AS filed
+    RETURN t.name AS company,
+           t.ticker AS ticker,
+           t.relationship AS theyAre,
+           filed AS filedOn,
+           i.code AS itemCode,
+           i.meaning AS whatHappened,
+           i.category AS category,
+           i.severity AS severity,
+           t.exposure AS ourExposure,
+           edgarMatchedFiler,
+           accession
+    ORDER BY severity DESC, filedOn DESC
+    LIMIT $limit
+
+- name: ReadToday
+  description: Only the filings that would make you put your coffee down — bankruptcies, restatements, covenant defaults, impairments, auditor changes, delisting notices and changes of control. If this returns nothing, that is the answer you want and it is worth saying out loud.
+  params:
+    limit:
+      type: int
+      default: 20
+      description: "Maximum filings to return."
+    sinceMonths:
+      type: int
+      default: 18
+      description: "How far back to look, in months. EDGAR's index runs to 2001, and a ticker RETIRED and REISSUED to a different company will otherwise surface that company's filings as if they were yours."
+  cypher: |
+    MATCH (t:TrackedFiler)-[:HAS_FILING]->(f:Filing)
+    WHERE f.form = '8-K' AND f.primaryItem IS NOT NULL
+      AND f.fileDate >= toString(date() - duration({months: $sinceMonths}))
+    MATCH (i:EightKItem {code: f.primaryItem})
+    WHERE i.severity = 3
+    WITH t, i, f.accession AS accession, f.displayName AS edgarMatchedFiler, max(f.fileDate) AS filed
+    RETURN t.name AS company,
+           t.ticker AS ticker,
+           t.relationship AS theyAre,
+           filed AS filedOn,
+           i.meaning AS whatHappened,
+           i.category AS category,
+           t.exposure AS ourExposure,
+           edgarMatchedFiler,
+           accession
+    ORDER BY filedOn DESC
+    LIMIT $limit
+
+- name: GovernanceChanges
+  description: Who left, who arrived, and who signs off the accounts — officer and director departures, changes of control, and auditor changes across the companies you depend on. A supplier changing auditor twice in two years is a signal no dashboard shows you.
+  params:
+    limit:
+      type: int
+      default: 25
+      description: "Maximum filings to return."
+    sinceMonths:
+      type: int
+      default: 18
+      description: "How far back to look, in months. EDGAR's index runs to 2001, and a ticker RETIRED and REISSUED to a different company will otherwise surface that company's filings as if they were yours."
+  cypher: |
+    MATCH (t:TrackedFiler)-[:HAS_FILING]->(f:Filing)
+    WHERE f.form = '8-K' AND f.primaryItem IS NOT NULL
+      AND f.fileDate >= toString(date() - duration({months: $sinceMonths}))
+    MATCH (i:EightKItem {code: f.primaryItem})
+    WHERE i.category = 'governance'
+    WITH t, i, f.accession AS accession, f.displayName AS edgarMatchedFiler, max(f.fileDate) AS filed
+    RETURN t.name AS company,
+           t.ticker AS ticker,
+           filed AS filedOn,
+           i.code AS itemCode,
+           i.meaning AS whatHappened,
+           accession
+    ORDER BY filedOn DESC
+    LIMIT $limit
+
+- name: FilerActivity
+  description: One row per company you track — how much they have filed, when they last did, and the most serious thing in the window. The overview to start a conversation from.
+  params:
+    limit:
+      type: int
+      default: 30
+      description: "Maximum companies to return."
+    sinceMonths:
+      type: int
+      default: 18
+      description: "How far back to look, in months. EDGAR's index runs to 2001, and a ticker RETIRED and REISSUED to a different company will otherwise surface that company's filings as if they were yours."
+  cypher: |
+    MATCH (t:TrackedFiler)-[:HAS_FILING]->(f:Filing)
+    WHERE f.fileDate >= toString(date() - duration({months: $sinceMonths}))
+    OPTIONAL MATCH (i:EightKItem {code: f.primaryItem})
+    WITH t,
+         count(DISTINCT f.accession) AS filings,
+         count(DISTINCT CASE WHEN f.form = '8-K' THEN f.accession END) AS materialEvents,
+         max(f.fileDate) AS lastFiled,
+         max(coalesce(i.severity, 0)) AS worstSeverity
+    RETURN t.name AS company,
+           t.ticker AS ticker,
+           t.relationship AS theyAre,
+           filings,
+           materialEvents,
+           lastFiled,
+           worstSeverity,
+           CASE worstSeverity WHEN 3 THEN 'something serious in the window'
+                              WHEN 2 THEN 'worth a look'
+                              ELSE 'routine only' END AS verdict,
+           t.exposure AS ourExposure
+    ORDER BY worstSeverity DESC, lastFiled DESC
+    LIMIT $limit
+
+- name: ItemCatalog
+  description: "The 8-K item vocabulary this realm ships — every code, what it means, and the severity the views rank by. Read it to argue with the ranking: it is data in a file, not a judgement hidden in a query."
+  params:
+    limit:
+      type: int
+      default: 30
+      description: "Maximum codes to return."
+  cypher: |
+    MATCH (i:EightKItem)
+    RETURN i.code AS code, i.meaning AS meaning, i.category AS category, i.severity AS severity
+    ORDER BY severity DESC, code ASC
+    LIMIT $limit
+
+- name: FilingsByForm
+  description: Everything filed by the companies you track, newest first, whatever the form — 8-K material events, 10-Q quarterlies, 10-K annuals. For "what have they published lately" rather than "what should worry me".
+  params:
+    limit:
+      type: int
+      default: 40
+      description: "Maximum filings to return."
+    sinceMonths:
+      type: int
+      default: 18
+      description: "How far back to look, in months. EDGAR's index runs to 2001, and a ticker RETIRED and REISSUED to a different company will otherwise surface that company's filings as if they were yours."
+  cypher: |
+    MATCH (t:TrackedFiler)-[:HAS_FILING]->(f:Filing)
+    WHERE f.fileDate >= toString(date() - duration({months: $sinceMonths}))
+    WITH t, f.accession AS accession, f.form AS form, max(f.fileDate) AS filed
+    RETURN t.ticker AS ticker,
+           t.name AS company,
+           form,
+           filed AS filedOn,
+           accession
+    ORDER BY filedOn DESC
+    LIMIT $limit
+
+- name: CounterpartyBriefing
+  description: The paragraph to send round. Reads the most consequential filings across every company you depend on and writes what it means for you, using your own exposure notes. Costs a model call; the other views are the evidence under it.
+  params:
+    limit:
+      type: int
+      default: 20
+      description: "How many filings to feed the assessment."
+    sinceMonths:
+      type: int
+      default: 18
+      description: "How far back to look, in months. EDGAR's index runs to 2001, and a ticker RETIRED and REISSUED to a different company will otherwise surface that company's filings as if they were yours."
+  cypher: |
+    MATCH (t:TrackedFiler)-[:HAS_FILING]->(f:Filing)
+    WHERE f.form = '8-K' AND f.primaryItem IS NOT NULL
+      AND f.fileDate >= toString(date() - duration({months: $sinceMonths}))
+    MATCH (i:EightKItem {code: f.primaryItem})
+    WITH t, i, f.accession AS accession, max(f.fileDate) AS filed
+    ORDER BY i.severity DESC, filed DESC
+    LIMIT $limit
+    WITH collect(t.name + ' (' + t.ticker + '), which is our ' + coalesce(t.relationship, 'counterparty') +
+         ' — ' + coalesce(t.exposure, 'exposure not recorded') + ' — filed on ' + filed +
+         ': ' + i.meaning + ' [' + i.category + ', severity ' + toString(i.severity) + ']') AS facts
+    UNWIND facts AS fact
+    RETURN synthesize(fact,
+      'You are briefing an executive on what the companies their business depends on have just disclosed to the SEC. Using ONLY these filings, say in under 160 words: the single item that most deserves attention and why it matters GIVEN THE STATED EXPOSURE, anything else worth knowing, and what to do this week. Distinguish routine disclosures from real signals — most 8-K items are housekeeping and saying so is useful. Name companies and dates. Never mention a company, filing or exposure that is not listed, and never remark on the absence of one. Be direct; no preamble, no recommendations to buy anything.'
+    ) AS briefing

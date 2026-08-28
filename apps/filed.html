@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Filed</title>
+<meta name="description" content="What the companies you depend on have told the SEC — 8-K material events decoded into what actually happened, ranked by consequence, against what you have riding on each of them.">
+<link rel="stylesheet" href="/api/v1/apps-runtime/v1/theme.css">
+<script src="/api/v1/apps-runtime/v1/embabel.js"></script>
+<script type="application/embabel-app+json">
+{"version":1,"name":"filed","requires":{"lenses":[],"views":["MaterialEvents","ReadToday","GovernanceChanges","FilerActivity","ItemCatalog","FilingsByForm","CounterpartyBriefing"],"realms":["realm-filings"],"namespaces":[]}}
+</script>
+<style>
+  :root{--bg:#0a0a0f;--surface:#13131a;--border:#1e1e2e;--cyan:#63c0f5;--purple:#9f77cd;
+        --green:#3fd73c;--dim:#6b7280;--text:#e5e7eb;--amber:#e8b64c;--red:#e2685f;}
+  *{box-sizing:border-box;}
+  body{margin:0;padding:0 0 56px;background:var(--bg);color:var(--text);
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.5;}
+  .wrap{max-width:1160px;margin:0 auto;padding:26px 20px 8px;}
+  header h1{margin:0;font-size:1.75rem;font-weight:300;letter-spacing:.1em;text-transform:uppercase;}
+  header p.sub{margin:6px 0 0;color:var(--dim);font-size:.88rem;max-width:72ch;}
+  .verdict{margin:22px 0 0;padding:18px 20px;background:var(--surface);border:1px solid var(--border);
+           border-left:3px solid var(--dim);border-radius:10px;}
+  .verdict.hot{border-left-color:var(--red);} .verdict.calm{border-left-color:var(--green);}
+  .verdict .big{font-size:1.28rem;font-weight:500;}
+  .verdict .why{color:var(--dim);font-size:.88rem;margin-top:5px;}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px;}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px 16px;}
+  .tile .n{font-size:1.7rem;font-weight:600;font-variant-numeric:tabular-nums;}
+  .tile .l{color:var(--dim);font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;margin-top:2px;}
+  nav{display:flex;flex-wrap:wrap;gap:6px;margin:24px 0 14px;}
+  nav button{background:transparent;border:1px solid var(--border);color:var(--dim);padding:7px 14px;
+             border-radius:999px;cursor:pointer;font-size:.84rem;font-family:inherit;}
+  nav button:hover{color:var(--text);border-color:var(--cyan);}
+  nav button[aria-selected="true"]{background:var(--cyan);border-color:var(--cyan);color:#06121c;}
+  .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+  .toolbar .spacer{flex:1;}
+  .refresh,select{background:transparent;border:1px solid var(--border);color:var(--dim);padding:6px 12px;
+           border-radius:6px;cursor:pointer;font-size:.79rem;font-family:inherit;}
+  .refresh:hover{color:var(--cyan);border-color:var(--cyan);}
+  .stamp{color:var(--dim);font-size:.76rem;}
+  .scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  th{text-align:left;color:var(--dim);font-weight:500;font-size:.7rem;text-transform:uppercase;
+     letter-spacing:.07em;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tbody tr:hover{background:rgba(99,192,245,.05);}
+  .num{font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8rem;}
+  .pill{font-size:.67rem;text-transform:uppercase;letter-spacing:.05em;border-radius:4px;padding:2px 7px;
+        border:1px solid var(--border);color:var(--dim);white-space:nowrap;}
+  .sev3{color:var(--red);font-weight:600;} .sev2{color:var(--amber);} .sev1{color:var(--dim);}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;}
+  .exposure{color:var(--dim);font-size:.78rem;margin-top:3px;}
+  .note{margin:14px 0 0;padding:12px 14px;border-radius:8px;font-size:.83rem;
+        background:rgba(232,182,76,.08);border:1px solid rgba(232,182,76,.28);color:#f0d49a;}
+  .empty{padding:26px;text-align:center;color:var(--dim);}
+  .prose{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px;
+         white-space:pre-wrap;font-size:.92rem;max-width:78ch;}
+  .panel{display:none;} .panel.on{display:block;}
+  footer.src{margin:32px 0 10px;color:var(--dim);font-size:.77rem;max-width:82ch;}
+  footer.src a{color:var(--cyan);text-decoration:none;} footer.src a:hover{text-decoration:underline;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Filed</h1>
+    <p class="sub">A public company cannot quietly change its chief executive, restate its accounts or default on a covenant — it has four business days to say so. Almost nobody reads those filings. This does.</p>
+  </header>
+
+  <div class="verdict" id="verdict">
+    <div class="big" id="verdict-big">Reading EDGAR&hellip;</div>
+    <div class="why" id="verdict-why">Every filing from the companies you depend on, decoded.</div>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <nav id="tabs" role="tablist">
+    <button role="tab" data-panel="events" aria-selected="true">Material events</button>
+    <button role="tab" data-panel="serious" aria-selected="false">Read today</button>
+    <button role="tab" data-panel="governance" aria-selected="false">Who left</button>
+    <button role="tab" data-panel="filers" aria-selected="false">By company</button>
+    <button role="tab" data-panel="all" aria-selected="false">Everything filed</button>
+    <button role="tab" data-panel="catalog" aria-selected="false">The codebook</button>
+    <button role="tab" data-panel="brief" aria-selected="false">Briefing</button>
+  </nav>
+
+  <div class="toolbar">
+    <embabel-operation-state id="state"></embabel-operation-state>
+    <label class="stamp" for="window">window</label>
+    <select id="window" aria-label="How far back to look">
+      <option value="3">3 months</option>
+      <option value="6">6 months</option>
+      <option value="18" selected>18 months</option>
+      <option value="60">5 years</option>
+    </select>
+    <span class="spacer"></span>
+    <span class="stamp" id="stamp"></span>
+    <button class="refresh" id="refresh" type="button">Refresh</button>
+  </div>
+
+  <section class="panel on" id="panel-events"></section>
+  <section class="panel" id="panel-serious"></section>
+  <section class="panel" id="panel-governance"></section>
+  <section class="panel" id="panel-filers"></section>
+  <section class="panel" id="panel-all"></section>
+  <section class="panel" id="panel-catalog"></section>
+  <section class="panel" id="panel-brief"></section>
+
+  <footer class="src">
+    Filings from the <a href="https://efts.sec.gov" target="_blank" rel="noopener noreferrer">SEC's EDGAR full-text search</a>.
+    US-listed filers only — a company that does not file with the SEC is out of scope, not quiet.
+    The <em>filed</em> date is not the event date: a company has four business days to disclose.
+    Severity is this realm's own judgement, published in the codebook so it can be argued with.
+  </footer>
+</div>
+
+<div id="embabel-badge" style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:6px 0;background:rgba(10,10,15,0.9);border-top:1px solid rgba(99,192,245,0.2);font-size:0.75rem;color:#6b7280;z-index:9999;pointer-events:none;">
+  Created with <a href="https://embabel.com" target="_blank" rel="noopener noreferrer" style="color:#63c0f5;text-decoration:none;pointer-events:auto;">Embabel Me</a>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  function escapeHtml(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  var stateEl = document.getElementById('state');
+  var cache = {}, inflight = {};
+  function months() { return Number(document.getElementById('window').value) || 18; }
+  function ck(name) { return name + ':' + months(); }
+
+  function rowsOf(r) {
+    if (!r) return [];
+    if (Array.isArray(r)) return r;
+    if (Array.isArray(r.data)) return r.data;
+    if (r.data && Array.isArray(r.data.rows)) return r.data.rows;
+    if (Array.isArray(r.rows)) return r.rows;
+    return [];
+  }
+  function warningsOf(r) {
+    if (!r) return [];
+    if (Array.isArray(r.warnings)) return r.warnings;
+    if (r.data && Array.isArray(r.data.warnings)) return r.data.warnings;
+    return [];
+  }
+
+  /* Cached per view AND per window, so changing the window is a real re-query
+     but flipping back to one already seen is free. */
+  function load(name, params, force) {
+    var key = ck(name);
+    if (!force && cache[key]) return Promise.resolve(cache[key]);
+    if (inflight[key]) return inflight[key];
+    var p = embabel.views.invoke(name, params || {}, { state: stateEl })
+      .then(function (res) {
+        var packed = { rows: rowsOf(res), warnings: warningsOf(res) };
+        cache[key] = packed; inflight[key] = null; return packed;
+      })
+      .catch(function (e) { inflight[key] = null; throw e; });
+    inflight[key] = p;
+    return p;
+  }
+
+  function failure(el, e) {
+    el.innerHTML = '<div class="note"><strong>EDGAR could not be read.</strong> ' +
+      escapeHtml(e && e.message ? e.message : String(e)) +
+      ' — this is the lookup failing, not a quiet quarter.</div>';
+  }
+  function warnBlock(w) {
+    if (!w || !w.length) return '';
+    return '<div class="note"><strong>Partial answer.</strong> ' +
+      w.map(function (x) { return escapeHtml(String(x).slice(0, 240)); }).join('<br>') + '</div>';
+  }
+  function stamp() { document.getElementById('stamp').textContent = 'read at ' + new Date().toLocaleTimeString(); }
+  function sevClass(s) { return 'sev' + (Number(s) || 1); }
+  function sevColour(s) { return Number(s) === 3 ? 'var(--red)' : Number(s) === 2 ? 'var(--amber)' : 'var(--dim)'; }
+  function tiles(t) {
+    document.getElementById('tiles').innerHTML = t.map(function (x) {
+      return '<div class="tile"><div class="n" style="color:' + x.colour + '">' + escapeHtml(x.n) +
+             '</div><div class="l">' + escapeHtml(x.l) + '</div></div>';
+    }).join('');
+  }
+
+  function eventRow(r, withExposure) {
+    return '<tr>' +
+      '<td><span class="dot" style="background:' + sevColour(r.severity) + '"></span>' +
+        escapeHtml(r.company) + ' <span class="pill">' + escapeHtml(r.ticker) + '</span>' +
+        (withExposure && r.ourExposure ? '<div class="exposure">' + escapeHtml(r.ourExposure) + '</div>' : '') +
+      '</td>' +
+      '<td class="num">' + escapeHtml(r.filedOn) + '</td>' +
+      '<td class="mono">' + escapeHtml(r.itemCode || '') + '</td>' +
+      '<td class="' + sevClass(r.severity) + '">' + escapeHtml(r.whatHappened) + '</td>' +
+      '<td><span class="pill">' + escapeHtml(r.category || '') + '</span></td>' +
+      '<td class="mono" style="color:var(--dim)">' + escapeHtml(r.accession) + '</td>' +
+    '</tr>';
+  }
+
+  function renderEvents(force) {
+    var el = document.getElementById('panel-events');
+    return Promise.all([load('MaterialEvents', { limit: 60, sinceMonths: months() }, force),
+                        load('FilerActivity',  { limit: 60, sinceMonths: months() }, force)])
+      .then(function (both) {
+        var rows = both[0].rows, filers = both[1].rows;
+        var serious = rows.filter(function (r) { return Number(r.severity) === 3; });
+        tiles([
+          { n: filers.length, l: 'companies watched', colour: 'var(--text)' },
+          { n: rows.length, l: 'material events', colour: 'var(--text)' },
+          { n: serious.length, l: 'need reading today', colour: serious.length ? 'var(--red)' : 'var(--green)' },
+          { n: months() + 'm', l: 'window', colour: 'var(--dim)' },
+        ]);
+        var v = document.getElementById('verdict');
+        if (!rows.length) {
+          v.className = 'verdict calm';
+          document.getElementById('verdict-big').textContent = 'Nothing disclosed in this window.';
+          document.getElementById('verdict-why').textContent =
+            'No tracked company filed an 8-K in the last ' + months() + ' months. Widen the window, or add companies.';
+          el.innerHTML = '<div class="empty">No material events in the window.</div>';
+          stamp(); return;
+        }
+        var top = serious[0] || rows[0];
+        v.className = serious.length ? 'verdict hot' : 'verdict calm';
+        document.getElementById('verdict-big').textContent = serious.length
+          ? serious.length + (serious.length === 1 ? ' filing needs' : ' filings need') + ' reading today.'
+          : 'Nothing serious — ' + rows.length + ' routine disclosures in the window.';
+        document.getElementById('verdict-why').textContent =
+          top.company + ' (' + top.ticker + '), our ' + (top.theyAre || 'counterparty') +
+          ', filed on ' + top.filedOn + ': ' + top.whatHappened +
+          (top.ourExposure ? ' We have riding on this: ' + top.ourExposure : '');
+        el.innerHTML = warnBlock(both[0].warnings) +
+          '<div class="scroll"><table><thead><tr><th>Company</th><th>Filed</th><th>Item</th>' +
+          '<th>What happened</th><th>Category</th><th>Accession</th></tr></thead><tbody>' +
+          rows.map(function (r) { return eventRow(r, true); }).join('') + '</tbody></table></div>' +
+          '<div class="note">Ordered by consequence, then date — a restatement from two months ago outranks ' +
+          'yesterday&rsquo;s shareholder vote. The <em>filed</em> date can be up to four business days after the event.</div>';
+        stamp();
+      }).catch(function (e) { failure(el, e); });
+  }
+
+  function renderSerious(force) {
+    var el = document.getElementById('panel-serious');
+    return load('ReadToday', { limit: 40, sinceMonths: months() }, force).then(function (r) {
+      if (!r.rows.length) {
+        el.innerHTML = '<div class="empty">Nothing serious in the last ' + months() +
+          ' months &mdash; no bankruptcy, restatement, default, impairment, auditor change, delisting notice ' +
+          'or change of control. That is the answer you want, and it is worth saying out loud.</div>';
+        return;
+      }
+      el.innerHTML = warnBlock(r.warnings) +
+        '<div class="scroll"><table><thead><tr><th>Company</th><th>Filed</th><th>What happened</th>' +
+        '<th>Category</th><th>Accession</th></tr></thead><tbody>' +
+        r.rows.map(function (x) {
+          return '<tr><td>' + escapeHtml(x.company) + ' <span class="pill">' + escapeHtml(x.ticker) + '</span>' +
+            (x.ourExposure ? '<div class="exposure">' + escapeHtml(x.ourExposure) + '</div>' : '') + '</td>' +
+            '<td class="num">' + escapeHtml(x.filedOn) + '</td>' +
+            '<td class="sev3">' + escapeHtml(x.whatHappened) + '</td>' +
+            '<td><span class="pill">' + escapeHtml(x.category) + '</span></td>' +
+            '<td class="mono" style="color:var(--dim)">' + escapeHtml(x.accession) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+      stamp();
+    }).catch(function (e) { failure(el, e); });
+  }
+
+  function renderGovernance(force) {
+    var el = document.getElementById('panel-governance');
+    return load('GovernanceChanges', { limit: 50, sinceMonths: months() }, force).then(function (r) {
+      if (!r.rows.length) { el.innerHTML = '<div class="empty">No governance changes in the window.</div>'; return; }
+      el.innerHTML = warnBlock(r.warnings) +
+        '<div class="scroll"><table><thead><tr><th>Company</th><th>Filed</th><th>Item</th>' +
+        '<th>What happened</th><th>Accession</th></tr></thead><tbody>' +
+        r.rows.map(function (x) {
+          return '<tr><td>' + escapeHtml(x.company) + ' <span class="pill">' + escapeHtml(x.ticker) + '</span></td>' +
+            '<td class="num">' + escapeHtml(x.filedOn) + '</td>' +
+            '<td class="mono">' + escapeHtml(x.itemCode) + '</td>' +
+            '<td>' + escapeHtml(x.whatHappened) + '</td>' +
+            '<td class="mono" style="color:var(--dim)">' + escapeHtml(x.accession) + '</td></tr>';
+        }).join('') + '</tbody></table></div>' +
+        '<div class="note">A supplier changing auditor twice in two years is a signal no dashboard shows you.</div>';
+      stamp();
+    }).catch(function (e) { failure(el, e); });
+  }
+
+  function renderFilers(force) {
+    var el = document.getElementById('panel-filers');
+    return load('FilerActivity', { limit: 60, sinceMonths: months() }, force).then(function (r) {
+      if (!r.rows.length) {
+        el.innerHTML = '<div class="empty">No companies tracked yet. Add a TrackedFiler with an EDGAR key.</div>';
+        return;
+      }
+      el.innerHTML = warnBlock(r.warnings) +
+        '<div class="scroll"><table><thead><tr><th>Company</th><th>They are</th><th>Filings</th>' +
+        '<th>8-Ks</th><th>Last filed</th><th>Verdict</th></tr></thead><tbody>' +
+        r.rows.map(function (x) {
+          return '<tr><td><span class="dot" style="background:' + sevColour(x.worstSeverity) + '"></span>' +
+            escapeHtml(x.company) + ' <span class="pill">' + escapeHtml(x.ticker) + '</span>' +
+            (x.ourExposure ? '<div class="exposure">' + escapeHtml(x.ourExposure) + '</div>' : '') + '</td>' +
+            '<td><span class="pill">' + escapeHtml(x.theyAre || '') + '</span></td>' +
+            '<td class="num">' + escapeHtml(x.filings) + '</td>' +
+            '<td class="num">' + escapeHtml(x.materialEvents) + '</td>' +
+            '<td class="num">' + escapeHtml(x.lastFiled || '') + '</td>' +
+            '<td class="' + sevClass(x.worstSeverity) + '">' + escapeHtml(x.verdict) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+      stamp();
+    }).catch(function (e) { failure(el, e); });
+  }
+
+  function renderAll(force) {
+    var el = document.getElementById('panel-all');
+    return load('FilingsByForm', { limit: 80, sinceMonths: months() }, force).then(function (r) {
+      if (!r.rows.length) { el.innerHTML = '<div class="empty">Nothing filed in the window.</div>'; return; }
+      el.innerHTML = warnBlock(r.warnings) +
+        '<div class="scroll"><table><thead><tr><th>Company</th><th>Form</th><th>Filed</th>' +
+        '<th>Accession</th></tr></thead><tbody>' +
+        r.rows.map(function (x) {
+          return '<tr><td>' + escapeHtml(x.company) + ' <span class="pill">' + escapeHtml(x.ticker) + '</span></td>' +
+            '<td><span class="pill">' + escapeHtml(x.form) + '</span></td>' +
+            '<td class="num">' + escapeHtml(x.filedOn) + '</td>' +
+            '<td class="mono" style="color:var(--dim)">' + escapeHtml(x.accession) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+      stamp();
+    }).catch(function (e) { failure(el, e); });
+  }
+
+  function renderCatalog(force) {
+    var el = document.getElementById('panel-catalog');
+    return load('ItemCatalog', { limit: 40 }, force).then(function (r) {
+      if (!r.rows.length) { el.innerHTML = '<div class="empty">The item catalog did not load.</div>'; return; }
+      el.innerHTML =
+        '<div class="scroll"><table><thead><tr><th>Code</th><th>Means</th><th>Category</th>' +
+        '<th>Severity</th></tr></thead><tbody>' +
+        r.rows.map(function (x) {
+          return '<tr><td class="mono">' + escapeHtml(x.code) + '</td>' +
+            '<td class="' + sevClass(x.severity) + '">' + escapeHtml(x.meaning) + '</td>' +
+            '<td><span class="pill">' + escapeHtml(x.category) + '</span></td>' +
+            '<td class="num ' + sevClass(x.severity) + '">' + escapeHtml(x.severity) + '</td></tr>';
+        }).join('') + '</tbody></table></div>' +
+        '<div class="note">This vocabulary ships with the realm as data, not as a lookup buried in a query. ' +
+        'The severity is the realm&rsquo;s own judgement &mdash; a lender and a procurement team would score ' +
+        '&ldquo;took on a material financial obligation&rdquo; differently, and either can edit the file.</div>';
+      stamp();
+    }).catch(function (e) { failure(el, e); });
+  }
+
+  function renderBrief(force) {
+    var el = document.getElementById('panel-brief');
+    return load('CounterpartyBriefing', { limit: 20, sinceMonths: months() }, force).then(function (r) {
+      if (!r.rows.length || !r.rows[0].briefing) {
+        el.innerHTML = '<div class="empty">Nothing filed in the window to brief on.</div>';
+        return;
+      }
+      el.innerHTML = warnBlock(r.warnings) +
+        '<div class="prose">' + escapeHtml(r.rows[0].briefing) + '</div>' +
+        '<div class="note">Written from the filings on the other tabs and your own exposure notes, and from nothing else.</div>';
+      stamp();
+    }).catch(function (e) { failure(el, e); });
+  }
+
+  var renderers = { events: renderEvents, serious: renderSerious, governance: renderGovernance,
+                    filers: renderFilers, all: renderAll, catalog: renderCatalog, brief: renderBrief };
+  var current = 'events';
+
+  function show(name, force) {
+    current = name;
+    var bs = document.querySelectorAll('#tabs button');
+    for (var i = 0; i < bs.length; i++) {
+      bs[i].setAttribute('aria-selected', bs[i].dataset.panel === name ? 'true' : 'false');
+    }
+    var ps = document.querySelectorAll('.panel');
+    for (var j = 0; j < ps.length; j++) ps[j].classList.remove('on');
+    var el = document.getElementById('panel-' + name);
+    el.classList.add('on');
+    if (!el.innerHTML.trim() || force) {
+      el.innerHTML = '<div class="empty">Reading EDGAR&hellip;</div>';
+      renderers[name](force);
+    }
+  }
+
+  document.getElementById('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-panel]');
+    if (b) show(b.dataset.panel, false);
+  });
+  document.getElementById('refresh').addEventListener('click', function () { show(current, true); });
+  document.getElementById('window').addEventListener('change', function () {
+    /* A new window is a different question, so every panel is stale. */
+    var ps = document.querySelectorAll('.panel');
+    for (var i = 0; i < ps.length; i++) ps[i].innerHTML = '';
+    show(current, false);
+  });
+
+  function start() { show('events', false); }
+
+  if (embabel.manifest && embabel.manifest.ready) {
+    embabel.manifest.ready.then(function (m) {
+      if (m && m.ok === false) {
+        var missing = (m.missing || []).map(function (x) { return escapeHtml(String(x)); }).join(', ');
+        document.getElementById('verdict-big').textContent = 'This world is missing what the app reads.';
+        document.getElementById('verdict-why').textContent =
+          'Install realm-filings and add the companies you depend on' + (missing ? ' (missing: ' + missing + ')' : '') + '.';
+        return;
+      }
+      start();
+    }).catch(start);
+  } else { start(); }
+})();
+</script>
+</body>
+</html>

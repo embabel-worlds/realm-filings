@@ -1,0 +1,61 @@
+# The 8-K item catalog, as DATA.
+#
+# An 8-K's payload is a list of codes, and the codes are the whole story: 5.02
+# is a senior officer leaving, 4.02 is a company saying its own past accounts
+# cannot be relied on. Shipping that mapping here rather than as a CASE
+# expression inside a view means it is one definition, queryable, arguable, and
+# reusable by anything that joins to it.
+#
+# `severity` is THIS REALM'S judgement of how much a code should raise an
+# eyebrow, not an SEC classification. 3 means read it today; 1 means routine
+# housekeeping. It is written down so it can be disagreed with — a lender and a
+# procurement team would score 2.03 differently, and either can edit this file.
+#
+# No user anchor: this is a global vocabulary, not anybody's preference, so the
+# records are seeded plain — the same shape realm-movie's streaming catalogue
+# uses.
+
+- type: EightKItem
+  data: { code: "1.01", meaning: "Entered a material definitive agreement — a contract big enough that shareholders must be told.", severity: 2, category: transaction }
+- type: EightKItem
+  data: { code: "1.02", meaning: "Terminated a material definitive agreement. A contract that mattered has ended.", severity: 3, category: transaction }
+- type: EightKItem
+  data: { code: "1.03", meaning: "Bankruptcy or receivership.", severity: 3, category: distress }
+- type: EightKItem
+  data: { code: "1.05", meaning: "Material cybersecurity incident.", severity: 3, category: distress }
+- type: EightKItem
+  data: { code: "2.01", meaning: "Completed an acquisition or disposal of assets.", severity: 2, category: transaction }
+- type: EightKItem
+  data: { code: "2.02", meaning: "Results of operations — the quarterly numbers.", severity: 2, category: financial }
+- type: EightKItem
+  data: { code: "2.03", meaning: "Took on a material financial obligation — new debt or an off-balance-sheet commitment.", severity: 2, category: financial }
+- type: EightKItem
+  data: { code: "2.04", meaning: "Triggered an acceleration or default on a financial obligation. A covenant has been breached.", severity: 3, category: distress }
+- type: EightKItem
+  data: { code: "2.05", meaning: "Committed to an exit or disposal plan — restructuring, and usually redundancies.", severity: 3, category: distress }
+- type: EightKItem
+  data: { code: "2.06", meaning: "Material impairment — wrote down the value of something it owns.", severity: 3, category: distress }
+- type: EightKItem
+  data: { code: "3.01", meaning: "Delisting notice or failure to satisfy a listing rule.", severity: 3, category: distress }
+- type: EightKItem
+  data: { code: "3.02", meaning: "Unregistered sale of equity securities — raised money privately.", severity: 2, category: financial }
+- type: EightKItem
+  data: { code: "3.03", meaning: "Material modification to the rights of security holders.", severity: 2, category: governance }
+- type: EightKItem
+  data: { code: "4.01", meaning: "Changed auditor. Worth asking who left and why.", severity: 3, category: governance }
+- type: EightKItem
+  data: { code: "4.02", meaning: "Previously issued financial statements can NO LONGER BE RELIED ON — a restatement. Among the most serious things a company files.", severity: 3, category: distress }
+- type: EightKItem
+  data: { code: "5.01", meaning: "Change in control of the company.", severity: 3, category: governance }
+- type: EightKItem
+  data: { code: "5.02", meaning: "A director or senior officer departed, was removed, or was appointed.", severity: 2, category: governance }
+- type: EightKItem
+  data: { code: "5.03", meaning: "Amended the articles or bylaws, or changed the fiscal year.", severity: 1, category: routine }
+- type: EightKItem
+  data: { code: "5.07", meaning: "Results of a shareholder vote.", severity: 1, category: routine }
+- type: EightKItem
+  data: { code: "7.01", meaning: "Regulation FD disclosure — something told to the market generally.", severity: 1, category: routine }
+- type: EightKItem
+  data: { code: "8.01", meaning: "Other events the company chose to report. Contents vary from trivial to serious.", severity: 2, category: routine }
+- type: EightKItem
+  data: { code: "9.01", meaning: "Financial statements and exhibits — the attachments to another item, not an event in itself.", severity: 1, category: routine }

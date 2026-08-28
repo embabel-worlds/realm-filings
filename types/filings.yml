@@ -1,0 +1,60 @@
+# One STORED anchor, one VIRTUAL fetch, and one CATALOG seeded as data.
+#
+#   TrackedFiler ──HAS_FILING──▶ Filing        fetched per ticker
+#   Filing.items ─────────────── EightKItem    joined on a code, in the query
+#
+# The catalog is the interesting part. An 8-K's payload is a list of item codes
+# — `5.02`, `4.02`, `1.03` — and the codes ARE the information: 5.02 is a senior
+# officer leaving, 4.02 is the company saying its own past accounts cannot be
+# relied on. Hardcoding that mapping inside a view would bury a controlled
+# vocabulary in a query, so it is shipped in `reference/` as ordinary graph data,
+# with a severity the views rank by.
+
+- name: TrackedFiler
+  description: "A US-listed company this world depends on, and what the dependency is. The one thing seeded by hand. `edgarKey` is what EDGAR is asked for and `ticker` is only how you refer to the company: EDGAR's `entityName` is a NAME search, so a distinctive ticker resolves cleanly while a common one does not, and a zero-padded CIK always does. `exposure` is what you would actually lose if this company had a bad quarter, and it is what makes a filing worth reading rather than merely true."
+  properties:
+    ticker:
+      description: "Exchange ticker, e.g. `SNOW`. Identity, and the join key."
+      metadata:
+        identity: "true"
+    edgarKey: "What EDGAR is asked for. A ZERO-PADDED CIK (`0001477333`) is an exact entity match and is what you want. A ticker also works and is far easier to obtain, but `entityName` is a NAME search rather than a ticker lookup, so a short or common ticker matches the wrong companies — `NET` returns HEALTH NET INC, not Cloudflare. Start with the ticker, run `filerCoverage`, and replace it with the CIK for anything it flags."
+    name: "The company as you refer to it."
+    relationship: "What they are to you: `customer`, `supplier`, `competitor`, `partner`, `investor`."
+    exposure: "What is at stake — the contract, the dependency, the revenue line. Plain words."
+    why: "Why you are watching them."
+
+- name: Filing
+  description: "One document a tracked company filed with the SEC. Reached from TrackedFiler via HAS_FILING. `items` matters most: on an 8-K it is the list of item codes saying WHAT was disclosed, and joining those to EightKItem turns `5.02` into 'a director or senior officer departed'. Results arrive in RELEVANCE order, never date order, so anything chronological must be ordered in the query. `fileDate` is the filing date, not the date of the event, which can be up to four business days earlier."
+  virtualJoins:
+    - anchorLabel: TrackedFiler
+      relationship: HAS_FILING
+      keyField: edgarKey
+      recordKeyField: key
+      producer: filingsByEntity
+      maxAnchors: 60
+      description: "Every filing this company has made that EDGAR's index holds — order by fileDate in the query, because the source does not."
+  properties:
+    docId:
+      description: "`<accession>:<document>`, unique per filed document. Identity — one document reached from two tracked companies (a merger announcement naming both) is ONE node with two edges."
+      metadata:
+        identity: "true"
+    key: "The ticker this was fetched for — the join link."
+    form: "Form type: `8-K` material event, `10-Q` quarterly, `10-K` annual, `DEF 14A` proxy."
+    fileDate: "Date filed, ISO. Not the date the event happened."
+    displayName: "How EDGAR names the filer — company, ticker and zero-padded CIK in one string."
+    cik: "The filer's zero-padded CIK."
+    accession: "SEC accession number — the citable identifier for the filing."
+    primaryItem: "For an 8-K, the FIRST item code disclosed — the substantive one. Join it to EightKItem to learn what it means. Null on forms that carry no items. EDGAR returns the items as an array and an array projection arrives null, so this is taken by position rather than as a list; an 8-K orders its substantive disclosure first and its `9.01` exhibits attachment last, so position one carries the story."
+    secondaryItem: "The SECOND item code, where there is one. Between them these two cover the overwhelming majority of filings; a filing disclosing three or more substantive items will under-report here, which is why the views name the field `primaryItem` rather than implying completeness."
+    description: "EDGAR's own description of the document."
+
+- name: EightKItem
+  description: "One 8-K item code and what it actually means, seeded by this realm as reference data. `severity` is this realm's own judgement of how much a code should raise an eyebrow — 3 is 'stop and read it', 1 is routine housekeeping — and it exists so the views can rank by consequence rather than by date. It is a judgement, not an SEC classification, and is stated here so it can be argued with rather than buried in a query."
+  properties:
+    code:
+      description: "The item number as EDGAR writes it, e.g. `5.02`. Identity."
+      metadata:
+        identity: "true"
+    meaning: "What the company is disclosing, in plain words."
+    severity: "1 routine, 2 worth knowing, 3 read it today. This realm's judgement."
+    category: "Rough grouping: `governance`, `financial`, `transaction`, `distress`, `routine`."

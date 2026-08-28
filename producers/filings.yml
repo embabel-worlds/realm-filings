@@ -1,0 +1,52 @@
+# One producer, keyed on whatever the filer says to ask EDGAR for.
+#
+# `entityName` is a NAME search, not a ticker lookup, and the difference is a
+# correctness bug rather than a nicety: `SNOW`, `CRM` and `MDB` resolve to the
+# companies you meant because those strings are distinctive, while `NET`
+# resolves to HEALTH NET INC and MARKETCENTRAL NET CORP — real filings,
+# correctly labelled, about companies nobody was asking about. A zero-padded CIK
+# is exact and always right; an UNPADDED one silently matches nothing at all.
+# So the key is `edgarKey`, the realm ships `filerCoverage` to detect a bad
+# match, and the choice between convenience and precision is the user's to make
+# with the consequence stated.
+#
+# No date range is sent. Every forward- or backward-looking parameter here takes
+# an explicit ISO date, and a date written into a producer is stale the next day;
+# so the realm fetches the entity's filings and orders them in the graph, where
+# "recent" is evaluated at query time.
+- name: filingsByEntity
+  kind: remote
+  operation: searchFilings
+  records: "$.hits.hits[*]"
+  keyArgs: [entityName]
+  echoKeyAs: key
+  maxKeysPerCall: 1
+  batchSafe: false
+  args:
+    # `q` is required by the endpoint even when entityName is doing the work.
+    # A bare wildcard is rejected, so this matches the form label itself, which
+    # every filing of these types contains.
+    q: "\"8-K\""
+    forms: "8-K,10-K,10-Q"
+  # Several of EDGAR's fields are ARRAYS — `items`, `display_names`, `ciks` — and
+  # a projection of a whole array arrives NULL rather than as a list property.
+  # A TRAILING index does resolve, so each is taken by position. That is not a
+  # loss worth hiding: an 8-K's items are ordered with the substantive
+  # disclosure first and the `9.01` exhibits attachment last, so slots one and
+  # two carry the story in the overwhelming majority of filings, and the views
+  # say `primaryItem` rather than pretending to a full list.
+  project:
+    docId: _id
+    form: _source.form
+    fileDate: _source.file_date
+    displayName: _source.display_names.0
+    cik: _source.ciks.0
+    accession: _source.adsh
+    primaryItem: _source.items.0
+    secondaryItem: _source.items.1
+    description: _source.file_description
+  # Filings are immutable once made and a company files a handful a year, so a
+  # day is generous. `negativeTtlSeconds` matters as much as the positive TTL:
+  # a company that has filed nothing indexable returns empty, and without it
+  # every query would re-ask about every quiet company forever.
+  cache: { kind: ttl, seconds: 86400, negativeTtlSeconds: 86400 }

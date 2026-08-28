@@ -1,0 +1,28 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SEC EDGAR full-text search",
+    "version": "1.0.0",
+    "description": "The search behind EDGAR's own filing search UI. Open, keyless, no account — but the SEC requires a User-Agent identifying the caller, and www.sec.gov returns 403 without one. Results come back in RELEVANCE order, not date order: `sort=date` is accepted and ignored, so anything time-ordered must be ordered by the caller after the fetch."
+  },
+  "servers": [{ "url": "https://efts.sec.gov" }],
+  "paths": {
+    "/LATEST/search-index": {
+      "get": {
+        "operationId": "searchFilings",
+        "summary": "Filings by a named entity, optionally restricted to a form type",
+        "description": "Returns Elasticsearch-shaped results: `{hits: {total: {value}, hits: [{_id, _source: {...}}]}}`. Each `_source` carries `form`, `file_date`, `display_names` (name, ticker and zero-padded CIK in one string), `ciks`, `adsh` (the accession number), `file_description` and — for an 8-K — `items`, the list of item codes saying WHAT was disclosed. `_id` is `<accession>:<document>` and is unique per filed document.\n\n`entityName` accepts a TICKER directly, which is the whole reason this realm needs no CIK lookup: a ticker is something a user already knows, and a CIK is not. It also accepts a zero-padded CIK; an unpadded one silently matches nothing.",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Full-text query. Required by the endpoint even when `entityName` is doing the real filtering." },
+          { "name": "entityName", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Ticker (e.g. `SNOW`) or zero-padded CIK. Restricts to that entity's own filings rather than every document mentioning it." },
+          { "name": "forms", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Comma-separated form types, e.g. `8-K` or `8-K,10-Q`." },
+          { "name": "startdt", "in": "query", "required": false, "schema": { "type": "string" }, "description": "ISO start date. Omitted here deliberately: a fixed date in a producer goes stale, so this realm fetches the entity's filings and orders them in the graph." },
+          { "name": "enddt", "in": "query", "required": false, "schema": { "type": "string" }, "description": "ISO end date. Omitted, for the same reason." }
+        ],
+        "responses": {
+          "200": { "description": "Search hits.", "content": { "application/json": { "schema": { "type": "object" } } } }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+# One source, no credential — but a REQUIRED identity. The SEC asks callers to
+# identify themselves in the User-Agent and enforces it with a 403 on
+# www.sec.gov. Without this header the realm looks like a broken integration
+# rather than a policy problem, which is the same trap Wikimedia sets.
+- url: edgar-fts.json
+  name: edgar
+  type: openapi
+  auth: none
+  headers:
+    User-Agent: "embabel-realm-filings/0.1 (https://embabel.com)"
+  operation-ids:
+    - searchFilings
