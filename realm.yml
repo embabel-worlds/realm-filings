@@ -20,6 +20,7 @@ description: |
   than returning silence for a company that simply does not file there.
 version: 0.1.0
 author: rod
+category: compliance
 tags:
   - filings
   - counterparty-risk
