@@ -18,7 +18,7 @@ description: |
   One source: the SEC's own EDGAR full-text search. Open, keyless, no account.
   US-listed filers only, which is a real limit and the realm says so rather
   than returning silence for a company that simply does not file there.
-version: 0.1.1
+version: 0.1.2
 author: rod
 category: compliance
 tags:
